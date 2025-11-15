@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -13,6 +14,22 @@ import (
 )
 
 var userState = make(map[int64]string)
+
+func startHealthCheckServer() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Запасной порт для локального запуска
+	}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Bot is alive!")
+	})
+
+	log.Printf("Starting health check server on :%s", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatalf("Failed to start health check server: %v", err)
+	}
+}
 
 func main() {
 	err := godotenv.Load()
@@ -37,6 +54,8 @@ func main() {
 	}
 	bot.Debug = true
 	log.Printf("Авторизован как %s", bot.Self.UserName)
+
+	go startHealthCheckServer()
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60

@@ -38,7 +38,7 @@
 ### 2. Клонирование репозитория
 
 ```bash
-git clone [https://github.com/ВАШ_ЛОГИН/ВАШ_РЕПОЗИТОРИЙ.git](https://github.com/ВАШ_ЛОГИН/ВАШ_РЕПОЗИТОРИЙ.git)
+git clone [https://github.com/pkosarev/my-weather-bot.git](https://github.com/pkosarev/my-weather-bot.git)
 cd my-weather-bot
 ```
 
@@ -50,7 +50,7 @@ Go сделает это автоматически при первой сбор
 go mod tidy
 ```
 
-### 4. Файл .env
+### 4. Файл `.env`
 
 Создайте файл .env в корне проекта и заполните его тремя ключами:
 

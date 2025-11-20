@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"my-weather-bot/config"
 	"my-weather-bot/llm"
 	"my-weather-bot/storage"
 	"my-weather-bot/weather"
@@ -18,18 +19,20 @@ const (
 )
 
 type Bot struct {
-	api           *tgbotapi.BotAPI
-	userState     map[int64]string
-	weatherApiKey string
-	llmClient     *llm.Client
+	api       *tgbotapi.BotAPI
+	userState map[int64]string
+	cfg       *config.Config
+	llmClient *llm.Client
 }
 
-func New(api *tgbotapi.BotAPI, weatherKey, groqKey string) *Bot {
+func New(api *tgbotapi.BotAPI, cfg *config.Config) *Bot {
+	apiKey := cfg.GroqApiKey
+
 	return &Bot{
-		api:           api,
-		userState:     make(map[int64]string),
-		weatherApiKey: weatherKey,
-		llmClient:     llm.NewClient(groqKey),
+		api:       api,
+		userState: make(map[int64]string),
+		cfg:       cfg,
+		llmClient: llm.NewClient(apiKey),
 	}
 }
 
@@ -37,6 +40,7 @@ func (b *Bot) Run() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 30
 	updates := b.api.GetUpdatesChan(u)
+
 	for update := range updates {
 		b.handleUpdate(update)
 	}
@@ -46,10 +50,12 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	if update.Message == nil {
 		return
 	}
+
 	if update.Message.IsCommand() {
 		b.handleCommand(update)
 		return
 	}
+
 	if update.Message.Location != nil {
 		b.handleLocation(update)
 		return
@@ -65,10 +71,11 @@ func (b *Bot) handleCommand(update tgbotapi.Update) {
 			log.Printf("Ошибка удаления локации при /start: %v", err)
 		}
 		log.Printf("Локация для %d удалена по команде /start", chatID)
+
 		msgText := "Привет! Я бот для велосипедистов. 🚴‍♂️\n\n" +
 			"Я *забыл* вашу старую геолокацию (если она была).\n\n" +
-			"/checkride - проверить погоду на данный момент.\n" +
-			"/forecast - получить прогноз на завтра и ближайшие 3 дня.\n\n" +
+			"/checkride - проверить погоду *на сейчас*.\n" +
+			"/forecast - получить прогноз *на 4 дня*.\n\n" +
 			"Обе команды теперь используют вашу сохраненную геолокацию. Если ее нет, я попрошу прислать ее один раз.\n\n" +
 			"/forgetlocation - удалить вашу сохраненную геолокацию."
 		b.api.Send(tgbotapi.NewMessage(chatID, msgText))
@@ -79,10 +86,7 @@ func (b *Bot) handleCommand(update tgbotapi.Update) {
 			b.sendTodayAnalysis(chatID, loc.Latitude, loc.Longitude)
 		} else {
 			b.userState[chatID] = "checkride_saveloc"
-			msg := tgbotapi.NewMessage(chatID,
-				"Я не знаю вашу геолокацию.\n\n"+
-					"Отправьте геолокацию (📎), и я запомню ее (для /checkride).")
-			b.api.Send(msg)
+			b.api.Send(tgbotapi.NewMessage(chatID, "Отправьте геолокацию (📎), и я запомню ее (для /checkride)."))
 		}
 
 	case "forecast":
@@ -91,10 +95,7 @@ func (b *Bot) handleCommand(update tgbotapi.Update) {
 			b.sendForecastAnalysis(chatID, loc.Latitude, loc.Longitude)
 		} else {
 			b.userState[chatID] = "forecast_saveloc"
-			msg := tgbotapi.NewMessage(chatID,
-				"Я не знаю вашу геолокацию.\n\n"+
-					"Отправьте геолокацию (📎), и я запомню ее (для /forecast).")
-			b.api.Send(msg)
+			b.api.Send(tgbotapi.NewMessage(chatID, "Отправьте геолокацию (📎), и я запомню ее (для /forecast)."))
 		}
 
 	case "forgetlocation":
@@ -117,7 +118,7 @@ func (b *Bot) handleLocation(update tgbotapi.Update) {
 
 	if err := storage.SaveLocation(chatID, location); err != nil {
 		log.Printf("НЕ УДАЛОСЬ СОХРАНИТЬ ЛОКАЦИЮ: %v", err)
-		b.api.Send(tgbotapi.NewMessage(chatID, "Не смог сохранить вашу геолокацию, произошла ошибка."))
+		b.api.Send(tgbotapi.NewMessage(chatID, "Не смог сохранить вашу геолокацию, произошла ошибка базы данных."))
 		return
 	}
 
@@ -139,7 +140,7 @@ func (b *Bot) handleLocation(update tgbotapi.Update) {
 }
 
 func (b *Bot) sendTodayAnalysis(chatID int64, lat, lon float64) {
-	weatherData, err := weather.GetWeather(lat, lon, b.weatherApiKey)
+	weatherData, err := weather.GetWeather(lat, lon, b.cfg.WeatherApiKey)
 	if err != nil {
 		log.Println(err)
 		b.api.Send(tgbotapi.NewMessage(chatID, "Не смог получить *текущую* погоду :("))
@@ -158,7 +159,7 @@ func (b *Bot) sendTodayAnalysis(chatID int64, lat, lon float64) {
 }
 
 func (b *Bot) sendForecastAnalysis(chatID int64, lat, lon float64) {
-	forecastData, err := weather.GetForecast(lat, lon, b.weatherApiKey)
+	forecastData, err := weather.GetForecast(lat, lon, b.cfg.WeatherApiKey)
 	if err != nil {
 		log.Println(err)
 		b.api.Send(tgbotapi.NewMessage(chatID, "Не смог получить *прогноз* :("))

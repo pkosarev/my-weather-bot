@@ -35,7 +35,7 @@ func New(api *tgbotapi.BotAPI, weatherKey, groqKey string) *Bot {
 
 func (b *Bot) Run() {
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+	u.Timeout = 30
 	updates := b.api.GetUpdatesChan(u)
 	for update := range updates {
 		b.handleUpdate(update)

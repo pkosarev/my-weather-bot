@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -29,7 +31,17 @@ func main() {
 	}
 	defer storage.DB.Close()
 
-	api, err := tgbotapi.NewBotAPI(telegramToken)
+	client := &http.Client{
+		Timeout: 40 * time.Second,
+
+		Transport: &http.Transport{
+
+			DisableKeepAlives: true,
+			MaxIdleConns:      -1,
+		},
+	}
+
+	api, err := tgbotapi.NewBotAPIWithClient(telegramToken, tgbotapi.APIEndpoint, client)
 	if err != nil {
 		log.Panic(err)
 	}

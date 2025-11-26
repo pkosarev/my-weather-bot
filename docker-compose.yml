@@ -26,7 +26,6 @@ services:
     ports:
       - "10808:10808"
 
-  # 3. Бот
   bot:
     container_name: ridebot-app
     build: .
